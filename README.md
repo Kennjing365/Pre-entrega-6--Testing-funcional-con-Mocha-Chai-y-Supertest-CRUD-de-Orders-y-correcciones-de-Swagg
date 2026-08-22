@@ -31,3 +31,22 @@ El Repository responde "¿cómo busco/guardo esto en la base?" — es intercambi
 - GET /api/users
 - GET /api/users/:id
 - POST /api/users
+
+## Mocking de datos de prueba
+
+### Endpoints
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | /api/mocks/users?qty=N | Genera N usuarios simulados, sin guardarlos en la base |
+| POST | /api/mocks/seed/users?qty=N | Genera e inserta N usuarios reales en MongoDB |
+| POST | /api/mocks/seed/orders?qty=N | Genera e inserta N pedidos, asociados a clientes existentes |
+| POST | /api/mocks/seed/deliveries?qty=N | Genera e inserta N entregas, asociadas a pedidos y repartidores existentes |
+
+### Orden recomendado para probar
+
+1. `POST /api/mocks/seed/users?qty=10` — para tener clientes y repartidores en la base
+2. `POST /api/mocks/seed/orders?qty=5` — se asocian a clientes ya sembrados
+3. `POST /api/mocks/seed/deliveries?qty=3` — se asocian a pedidos y repartidores ya sembrados
+
+Los datos generados respetan los modelos reales del proyecto y usan las constantes de roles, estados y prioridades definidas en `src/constants/index.js` — nunca strings sueltos.
