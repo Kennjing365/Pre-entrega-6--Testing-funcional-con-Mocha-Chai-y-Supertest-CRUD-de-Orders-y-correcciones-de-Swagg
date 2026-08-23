@@ -1,7 +1,7 @@
 # ShipNow API
 
 ## Temática
-API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, manejo centralizado de errores, y logging profesional con Winston.
+API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, manejo centralizado de errores, logging profesional con Winston, y documentación interactiva con Swagger.
 
 ## Tecnologías
 - Node.js
@@ -11,6 +11,8 @@ API backend para una plataforma de gestión de envíos/delivery. Administra usua
 - @faker-js/faker
 - winston
 - winston-daily-rotate-file
+- swagger-jsdoc
+- swagger-ui-express
 
 ## Cómo correr el proyecto localmente
 1. Cloná el repositorio
@@ -23,7 +25,7 @@ Si falta alguna variable obligatoria en el `.env`, la aplicación **no arranca**
 ## Variables de entorno
 - `PORT`: puerto donde corre el servidor
 - `MONGODB_URI`: cadena de conexión a MongoDB
-- `NODE_ENV`: entorno de ejecución (`development` / `production`). Además de habilitar validaciones, controla el comportamiento del logger (ver sección "Logging y monitoreo").
+- `NODE_ENV`: entorno de ejecución (`development` / `production`). Controla también el comportamiento del logger (ver sección "Logging y monitoreo").
 
 ## Estructura de carpetas
 
@@ -32,9 +34,12 @@ src/
 ├── server.js
 ├── config/
 │ ├── env.config.js
-│ └── logger.config.js
+│ ├── logger.config.js
+│ └── swagger.config.js
 ├── constants/
 │ └── index.js
+├── docs/
+│ └── schemas.js
 ├── errors/
 │ ├── CustomError.js
 │ └── errorDictionary.js
@@ -74,7 +79,7 @@ src/
 - **Repository**: único lugar que conoce Mongoose/MongoDB. Encapsula el acceso a datos (filtros, proyecciones, agregaciones) — nunca hace un simple `return model.find()` sin criterio.
 - **Service**: concentra toda la lógica de negocio (validaciones, cálculos, reglas de estado, relaciones entre entidades). Ante una condición de error, **lanza** (`throw`) un error personalizado — nunca responde HTTP directamente ni importa Mongoose.
 - **Controller**: única puerta de entrada HTTP. Extrae datos del request, llama al service dentro de un `try/catch`, y si el service lanza un error, lo delega con `next(error)`. Nunca decide códigos de error ni importa Mongoose.
-- **Router**: mínimo, solo conecta cada path con su método del controller correspondiente.
+- **Router**: mínimo, solo conecta cada path con su método del controller correspondiente. La documentación de Swagger vive en comentarios JSDoc encima de cada ruta, sin mezclar configuración con lógica.
 
 ### Por qué separar Service de Repository
 
@@ -97,7 +102,7 @@ Todos los errores del proyecto pasan por un middleware global centralizado (`src
 
 1. Los **services** detectan condiciones de error de negocio y las lanzan con errores personalizados definidos en `src/errors/`, usando el diccionario `ErrorDictionary`.
 2. Los **controllers** capturan la excepción en un `try/catch` y la delegan con `next(error)`.
-3. El **middleware global** intercepta cualquier error y arma la respuesta final HTTP, además de registrarlo con el logger (ver sección siguiente). Si el error no es uno de los personalizados, responde `500` con un mensaje genérico, sin exponer detalles técnicos internos.
+3. El **middleware global** intercepta cualquier error, lo registra con el logger, y arma la respuesta final HTTP. Si el error no es uno de los personalizados, responde `500` con un mensaje genérico, sin exponer detalles técnicos internos.
 
 ### Formato de respuesta de error
 
@@ -141,18 +146,44 @@ El proyecto usa **Winston** como logger centralizado, configurado en `src/config
 ### Persistencia en archivos
 Los niveles `warning`, `error` y `fatal` se guardan en la carpeta `logs/`, con rotación diaria (`logs/error-YYYY-MM-DD.log`) y retención de 14 días. Los niveles `info`, `http` y `debug` solo se muestran por consola, no se persisten en archivo.
 
-La carpeta `logs/` está incluida en `.gitignore` — los archivos generados por la aplicación (incluido el archivo de auditoría interno de la rotación) nunca se suben al repositorio.
+La carpeta `logs/` está incluida en `.gitignore` — los archivos generados por la aplicación nunca se suben al repositorio.
 
 ### Endpoint de prueba
 
-Genera un mensaje de cada uno de los 6 niveles. Revisá la consola (todos los niveles, en desarrollo) y el archivo `logs/error-YYYY-MM-DD.log` (solo `warning`, `error` y `fatal`).
+GET /api/logger/test
 
-### Puntos donde se usa el logger
-- Arranque del servidor y conexión a MongoDB (`info` en éxito, `fatal` si falla la conexión)
-- Middleware global de errores (`warning` para errores de negocio, `error` para fallas inesperadas del servidor)
-- Módulo de mocks (`debug` al generar datos sin persistir, `info` al sembrar exitosamente, `warning` ante validaciones fallidas, `error` ante fallas de inserción en MongoDB)
-- Operaciones sobre productos (`info` al crear/actualizar/eliminar, `warning` cuando no se encuentra el recurso)
-- Rutas inexistentes (`warning`)
+
+Genera un mensaje de cada uno de los 6 niveles.
+
+## Documentación de la API (Swagger)
+
+La API cuenta con documentación interactiva generada con Swagger/OpenAPI (configurada en `src/config/swagger.config.js`, completamente separada de la lógica de rutas), disponible en: 
+
+http://localhost:3000/api/docs
+
+
+Desde ahí se puede consultar la información general de la API, explorar los endpoints agrupados por módulo, y probarlos en vivo con el botón **"Try it out"**.
+
+### Módulos documentados (tags)
+
+- **Users**: CRUD de usuarios y productos
+- **Orders**: generación de pedidos de prueba — actualmente disponible únicamente a través del módulo de mocking (`POST /api/mocks/seed/orders`); no existe todavía un CRUD propio de pedidos como entidad de negocio independiente
+- **Deliveries**: generación de entregas de prueba — mismo caso que Orders, disponible vía mocking
+- **Mocks**: generación (sin persistir) y siembra (con persistencia) de datos simulados: usuarios, pedidos y entregas
+- **Logger**: endpoint interno de validación del sistema de logs — se documenta aclarando explícitamente que no es una funcionalidad de negocio, sino una herramienta de diagnóstico
+
+### Schemas reutilizables
+
+`User`, `Order`, `Delivery`, `OrderItem`, `Product`, `SuccessResponse`, `ErrorResponse` — definidos en `src/docs/schemas.js`.
+
+### Cómo probar
+
+1. Levantar el servidor con `npm run dev`
+2. Abrir `http://localhost:3000/api/docs` en el navegador
+3. Expandir cualquier endpoint, click en "Try it out", completar los parámetros o el body si corresponde, y ejecutar
+4. La respuesta real de la API se muestra directamente en la interfaz, incluyendo los casos de error documentados (por ejemplo, `GET /api/users/{id}` con un id inexistente devuelve `404` con el formato de `ErrorResponse`)
+
+La documentación refleja el comportamiento real de la API — no se documentan respuestas ni errores que el sistema no devuelve.
 
 ## Endpoints
 
@@ -212,3 +243,6 @@ Los datos generados respetan los modelos reales del proyecto y usan exclusivamen
 | Sembrar pedidos sin clientes en la base | `POST /api/mocks/seed/orders?qty=5` | 400, `MOCK_NO_CLIENTS_AVAILABLE` |
 | Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |
 | Ruta inexistente | `GET /api/no-existe` | 404, `ROUTE_NOT_FOUND` |
+
+
+

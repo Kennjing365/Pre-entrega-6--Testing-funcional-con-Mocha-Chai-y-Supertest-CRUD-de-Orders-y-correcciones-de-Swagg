@@ -1,4 +1,7 @@
 import express from 'express'
+import swaggerUi from 'swagger-ui-express'
+import { swaggerSpec } from './config/swagger.config.js'
+
 import productRouter from './routes/product.routes.js'
 import userRouter from './routes/user.routes.js'
 import mockRouter from './routes/mock.routes.js'
@@ -13,6 +16,9 @@ app.use(express.json())
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Servidor activo' })
 })
+
+// Documentación interactiva
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 app.use('/api/products', productRouter)
 app.use('/api/users', userRouter)
