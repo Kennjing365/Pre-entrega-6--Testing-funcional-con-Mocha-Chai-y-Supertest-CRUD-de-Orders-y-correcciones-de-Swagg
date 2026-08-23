@@ -1,7 +1,7 @@
 # ShipNow API
 
 ## Temática
-API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, y manejo centralizado de errores.
+API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, manejo centralizado de errores, y logging profesional con Winston.
 
 ## Tecnologías
 - Node.js
@@ -9,6 +9,8 @@ API backend para una plataforma de gestión de envíos/delivery. Administra usua
 - MongoDB / Mongoose
 - dotenv
 - @faker-js/faker
+- winston
+- winston-daily-rotate-file
 
 ## Cómo correr el proyecto localmente
 1. Cloná el repositorio
@@ -21,14 +23,16 @@ Si falta alguna variable obligatoria en el `.env`, la aplicación **no arranca**
 ## Variables de entorno
 - `PORT`: puerto donde corre el servidor
 - `MONGODB_URI`: cadena de conexión a MongoDB
-- `NODE_ENV`: entorno de ejecución (development/production)
+- `NODE_ENV`: entorno de ejecución (`development` / `production`). Además de habilitar validaciones, controla el comportamiento del logger (ver sección "Logging y monitoreo").
 
 ## Estructura de carpetas
+
 src/
 ├── app.js
 ├── server.js
 ├── config/
-│ └── env.config.js
+│ ├── env.config.js
+│ └── logger.config.js
 ├── constants/
 │ └── index.js
 ├── errors/
@@ -50,13 +54,16 @@ src/
 ├── controllers/
 │ ├── product.controller.js
 │ ├── user.controller.js
-│ └── mock.controller.js
+│ ├── mock.controller.js
+│ └── logger.controller.js
 ├── routes/
 │ ├── product.routes.js
 │ ├── user.routes.js
-│ └── mock.routes.js
+│ ├── mock.routes.js
+│ └── logger.routes.js
 ├── middlewares/
-│ └── errorHandler.middleware.js
+│ ├── errorHandler.middleware.js
+│ └── notFound.middleware.js
 └── utils/
 └── mockGenerators.js
 
@@ -65,7 +72,7 @@ src/
 
 - **Model**: define únicamente el esquema de Mongoose. No contiene lógica de negocio ni de request/response.
 - **Repository**: único lugar que conoce Mongoose/MongoDB. Encapsula el acceso a datos (filtros, proyecciones, agregaciones) — nunca hace un simple `return model.find()` sin criterio.
-- **Service**: concentra toda la lógica de negocio (validaciones, cálculos, reglas de estado, relaciones entre entidades). Es el único que decide *qué* hacer con los datos. Ante una condición de error, **lanza** (`throw`) un error personalizado — nunca responde HTTP directamente.
+- **Service**: concentra toda la lógica de negocio (validaciones, cálculos, reglas de estado, relaciones entre entidades). Ante una condición de error, **lanza** (`throw`) un error personalizado — nunca responde HTTP directamente ni importa Mongoose.
 - **Controller**: única puerta de entrada HTTP. Extrae datos del request, llama al service dentro de un `try/catch`, y si el service lanza un error, lo delega con `next(error)`. Nunca decide códigos de error ni importa Mongoose.
 - **Router**: mínimo, solo conecta cada path con su método del controller correspondiente.
 
@@ -88,9 +95,9 @@ Todos los errores del proyecto pasan por un middleware global centralizado (`src
 
 ### Cómo funciona
 
-1. Los **services** detectan condiciones de error de negocio (dato no encontrado, valor inválido, cantidad incorrecta, etc.) y las lanzan con errores personalizados definidos en `src/errors/`, usando el diccionario `ErrorDictionary` (`src/errors/errorDictionary.js`).
-2. Los **controllers** capturan la excepción en un `try/catch` y la delegan con `next(error)` — nunca deciden el código HTTP ni redactan el mensaje de error.
-3. El **middleware global** intercepta cualquier error lanzado en la cadena y arma la respuesta final HTTP, siempre con el mismo formato. Si el error no es uno de los personalizados (por ejemplo, un bug inesperado), responde `500` con un mensaje genérico, sin exponer detalles técnicos internos al cliente.
+1. Los **services** detectan condiciones de error de negocio y las lanzan con errores personalizados definidos en `src/errors/`, usando el diccionario `ErrorDictionary`.
+2. Los **controllers** capturan la excepción en un `try/catch` y la delegan con `next(error)`.
+3. El **middleware global** intercepta cualquier error y arma la respuesta final HTTP, además de registrarlo con el logger (ver sección siguiente). Si el error no es uno de los personalizados, responde `500` con un mensaje genérico, sin exponer detalles técnicos internos.
 
 ### Formato de respuesta de error
 
@@ -117,6 +124,35 @@ Todos los errores del proyecto pasan por un middleware global centralizado (`src
 | MOCK_NO_CLIENTS_AVAILABLE | 400 | No hay usuarios `CLIENTE` para asociar pedidos |
 | MOCK_NO_RELATED_DATA | 400 | No hay pedidos o repartidores para generar entregas |
 | MOCK_SEED_FAILED | 400 | Falla al insertar los datos de prueba en MongoDB |
+| ROUTE_NOT_FOUND | 404 | Ruta inexistente |
+
+## Logging y monitoreo
+
+### Herramienta
+El proyecto usa **Winston** como logger centralizado, configurado en `src/config/logger.config.js`, con rotación diaria de archivos mediante `winston-daily-rotate-file`.
+
+### Niveles de log (de más a menos severo)
+`fatal` → `error` → `warning` → `info` → `http` → `debug`
+
+### Comportamiento según entorno
+- **Desarrollo** (`NODE_ENV=development`): se muestran todos los niveles, incluido `debug`.
+- **Producción** (`NODE_ENV=production`): solo se registran desde `info` hacia arriba (se filtran `debug` y `http`).
+
+### Persistencia en archivos
+Los niveles `warning`, `error` y `fatal` se guardan en la carpeta `logs/`, con rotación diaria (`logs/error-YYYY-MM-DD.log`) y retención de 14 días. Los niveles `info`, `http` y `debug` solo se muestran por consola, no se persisten en archivo.
+
+La carpeta `logs/` está incluida en `.gitignore` — los archivos generados por la aplicación (incluido el archivo de auditoría interno de la rotación) nunca se suben al repositorio.
+
+### Endpoint de prueba
+
+Genera un mensaje de cada uno de los 6 niveles. Revisá la consola (todos los niveles, en desarrollo) y el archivo `logs/error-YYYY-MM-DD.log` (solo `warning`, `error` y `fatal`).
+
+### Puntos donde se usa el logger
+- Arranque del servidor y conexión a MongoDB (`info` en éxito, `fatal` si falla la conexión)
+- Middleware global de errores (`warning` para errores de negocio, `error` para fallas inesperadas del servidor)
+- Módulo de mocks (`debug` al generar datos sin persistir, `info` al sembrar exitosamente, `warning` ante validaciones fallidas, `error` ante fallas de inserción en MongoDB)
+- Operaciones sobre productos (`info` al crear/actualizar/eliminar, `warning` cuando no se encuentra el recurso)
+- Rutas inexistentes (`warning`)
 
 ## Endpoints
 
@@ -147,6 +183,12 @@ Todos los errores del proyecto pasan por un middleware global centralizado (`src
 | POST | /api/mocks/seed/orders?qty=N | Genera e inserta N pedidos, asociados a clientes ya existentes |
 | POST | /api/mocks/seed/deliveries?qty=N | Genera e inserta N entregas, asociadas a pedidos y repartidores existentes |
 
+### Logger
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | /api/logger/test | Genera un log de cada nivel (herramienta interna, no funcionalidad de negocio) |
+
 ## Cómo probar los endpoints de mocking
 
 Orden recomendado, porque cada paso depende de datos generados en el anterior:
@@ -168,4 +210,5 @@ Los datos generados respetan los modelos reales del proyecto y usan exclusivamen
 | Mock con cantidad no numérica | `GET /api/mocks/users?qty=abc` | 400, `MOCK_INVALID_QTY` |
 | Mock con cantidad excesiva | `GET /api/mocks/users?qty=500` | 400, `MOCK_QTY_TOO_LARGE` |
 | Sembrar pedidos sin clientes en la base | `POST /api/mocks/seed/orders?qty=5` | 400, `MOCK_NO_CLIENTS_AVAILABLE` |
-| Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |# Pre-entrega-3---Manejo-profesional-de-errores
+| Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |
+| Ruta inexistente | `GET /api/no-existe` | 404, `ROUTE_NOT_FOUND` |
