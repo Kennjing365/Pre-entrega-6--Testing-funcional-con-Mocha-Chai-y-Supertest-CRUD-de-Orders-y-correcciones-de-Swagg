@@ -168,4 +168,4 @@ Los datos generados respetan los modelos reales del proyecto y usan exclusivamen
 | Mock con cantidad no numérica | `GET /api/mocks/users?qty=abc` | 400, `MOCK_INVALID_QTY` |
 | Mock con cantidad excesiva | `GET /api/mocks/users?qty=500` | 400, `MOCK_QTY_TOO_LARGE` |
 | Sembrar pedidos sin clientes en la base | `POST /api/mocks/seed/orders?qty=5` | 400, `MOCK_NO_CLIENTS_AVAILABLE` |
-| Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |
+| Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |# Pre-entrega-3---Manejo-profesional-de-errores
