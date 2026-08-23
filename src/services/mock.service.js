@@ -1,9 +1,22 @@
 import { generateMockUser, generateMockOrder, generateMockDelivery } from '../utils/mockGenerators.js'
 import { insertMockUsers, insertMockOrders, insertMockDeliveries, findRandomUsersByRole, findRandomOrders } from '../repositories/mock.repository.js'
 import { USER_ROLES } from '../constants/index.js'
+import { ErrorDictionary } from '../error/errorDictionary.js'
 
-// Genera SIN guardar
+const MAX_QTY = 100
+
+const validateQty = (qty) => {
+    if (!Number.isInteger(qty) || qty <= 0) {
+        throw ErrorDictionary.MOCK_INVALID_QTY()
+    }
+    if (qty > MAX_QTY) {
+        throw ErrorDictionary.MOCK_QTY_TOO_LARGE()
+    }
+}
+
 export const generateUsersMock = (qty) => {
+    validateQty(qty)
+
     const users = []
     for (let i = 0; i < qty; i++) {
         users.push(generateMockUser())
@@ -11,19 +24,26 @@ export const generateUsersMock = (qty) => {
     return users
 }
 
-// Inserta en la base
 export const seedUsers = async (qty) => {
+    validateQty(qty)
+
     const usersData = generateUsersMock(qty)
-    const inserted = await insertMockUsers(usersData)
-    return { insertados: inserted.length, coleccion: 'usuarios' }
+
+    try {
+        const inserted = await insertMockUsers(usersData)
+        return { insertados: inserted.length, coleccion: 'usuarios' }
+    } catch (error) {
+        throw ErrorDictionary.MOCK_SEED_FAILED()
+    }
 }
 
 export const seedOrders = async (qty) => {
-    // Necesitamos usuarios con rol CLIENTE ya existentes para asociar el pedido
+    validateQty(qty)
+
     const clientes = await findRandomUsersByRole(USER_ROLES.CLIENTE, qty)
 
     if (clientes.length === 0) {
-        return { error: 'sin_clientes' }
+        throw ErrorDictionary.MOCK_NO_CLIENTS_AVAILABLE()
     }
 
     const ordersData = []
@@ -32,16 +52,22 @@ export const seedOrders = async (qty) => {
         ordersData.push(generateMockOrder(randomCliente._id))
     }
 
-    const inserted = await insertMockOrders(ordersData)
-    return { insertados: inserted.length, coleccion: 'pedidos' }
+    try {
+        const inserted = await insertMockOrders(ordersData)
+        return { insertados: inserted.length, coleccion: 'pedidos' }
+    } catch (error) {
+        throw ErrorDictionary.MOCK_SEED_FAILED()
+    }
 }
 
 export const seedDeliveries = async (qty) => {
+    validateQty(qty)
+
     const orders = await findRandomOrders(qty)
     const repartidores = await findRandomUsersByRole(USER_ROLES.REPARTIDOR, qty)
 
     if (orders.length === 0 || repartidores.length === 0) {
-        return { error: 'sin_datos_relacionados' }
+        throw ErrorDictionary.MOCK_NO_RELATED_DATA()
     }
 
     const deliveriesData = []
@@ -51,6 +77,10 @@ export const seedDeliveries = async (qty) => {
         deliveriesData.push(generateMockDelivery(randomOrder._id, randomRepartidor._id))
     }
 
-    const inserted = await insertMockDeliveries(deliveriesData)
-    return { insertados: inserted.length, coleccion: 'entregas' }
+    try {
+        const inserted = await insertMockDeliveries(deliveriesData)
+        return { insertados: inserted.length, coleccion: 'entregas' }
+    } catch (error) {
+        throw ErrorDictionary.MOCK_SEED_FAILED()
+    }
 }

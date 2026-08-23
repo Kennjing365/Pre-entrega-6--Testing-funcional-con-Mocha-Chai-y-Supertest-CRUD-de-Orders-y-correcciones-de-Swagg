@@ -1,39 +1,36 @@
 import { findAllUsers, findUserById, findUserByEmail, createUser } from '../repositories/user.repository.js'
 import { USER_ROLES } from '../constants/index.js'
+import { ErrorDictionary } from '../error/errorDictionary.js'
 
 export const getAllUsersService = async () => {
-    const users = await findAllUsers()
-    return { payload: users }
+    return findAllUsers()
 }
 
 export const getUserByIdService = async (id) => {
     const user = await findUserById(id)
     if (!user) {
-        return { error: 'no_encontrado' }
+        throw ErrorDictionary.USER_NOT_FOUND()
     }
-    return { payload: user }
+    return user
 }
 
 export const createUserService = async (userData) => {
     const { first_name, last_name, email, password } = userData
 
     if (!first_name || !last_name || !email || !password) {
-        return { error: 'campos_faltantes' }
+        throw ErrorDictionary.USER_MISSING_FIELDS()
     }
 
     const existingUser = await findUserByEmail(email)
     if (existingUser) {
-        return { error: 'email_existente' }
+        throw ErrorDictionary.USER_EMAIL_EXISTS()
     }
 
-    // El rol nunca se recibe del body: se aplica el default USER
-    const newUser = await createUser({
+    return createUser({
         first_name,
         last_name,
         email,
         password,
-        role: USER_ROLES.USER
+        role: USER_ROLES.CLIENTE
     })
-
-    return { payload: newUser }
 }
