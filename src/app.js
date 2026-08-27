@@ -8,6 +8,7 @@ import mockRouter from './routes/mock.routes.js'
 import loggerRouter from './routes/logger.routes.js'
 import { errorHandlerMiddleware } from './middlewares/errorHandler.middleware.js'
 import { notFoundMiddleware } from './middlewares/notFound.middleware.js'
+import orderRouter from './routes/order.routes.js'
 
 const app = express()
 
@@ -24,6 +25,7 @@ app.use('/api/products', productRouter)
 app.use('/api/users', userRouter)
 app.use('/api/mocks', mockRouter)
 app.use('/api/logger', loggerRouter)
+app.use('/api/orders', orderRouter)
 
 app.use(notFoundMiddleware)
 app.use(errorHandlerMiddleware)

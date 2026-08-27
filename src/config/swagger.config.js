@@ -17,6 +17,7 @@ const options = {
         ],
         tags: [
             { name: 'Users', description: 'Gestión de usuarios (clientes, repartidores, administradores)' },
+            { name: 'Products', description: 'Gestión de productos del catálogo' },
             { name: 'Orders', description: 'Pedidos generados mediante el módulo de mocking' },
             { name: 'Deliveries', description: 'Entregas generadas mediante el módulo de mocking' },
             { name: 'Mocks', description: 'Generación y siembra de datos de prueba' },

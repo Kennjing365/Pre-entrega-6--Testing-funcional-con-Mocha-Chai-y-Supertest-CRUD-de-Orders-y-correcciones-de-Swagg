@@ -1,7 +1,7 @@
 # ShipNow API
 
 ## Temática
-API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, manejo centralizado de errores, logging profesional con Winston, y documentación interactiva con Swagger.
+API backend para una plataforma de gestión de envíos/delivery. Administra usuarios (clientes, repartidores y administradores), productos, pedidos y entregas, con arquitectura profesional por capas, sistema de mocking para datos de prueba, manejo centralizado de errores, logging profesional con Winston, documentación interactiva con Swagger, y testing funcional automatizado.
 
 ## Tecnologías
 - Node.js
@@ -13,6 +13,10 @@ API backend para una plataforma de gestión de envíos/delivery. Administra usua
 - winston-daily-rotate-file
 - swagger-jsdoc
 - swagger-ui-express
+- mocha
+- chai
+- supertest
+- cross-env
 
 ## Cómo correr el proyecto localmente
 1. Cloná el repositorio
@@ -25,7 +29,7 @@ Si falta alguna variable obligatoria en el `.env`, la aplicación **no arranca**
 ## Variables de entorno
 - `PORT`: puerto donde corre el servidor
 - `MONGODB_URI`: cadena de conexión a MongoDB
-- `NODE_ENV`: entorno de ejecución (`development` / `production`). Controla también el comportamiento del logger (ver sección "Logging y monitoreo").
+- `NODE_ENV`: entorno de ejecución (`development` / `production` / `test`). Controla también el comportamiento del logger y qué archivo `.env` se carga.
 
 ## Estructura de carpetas
 
@@ -51,26 +55,38 @@ src/
 ├── repositories/
 │ ├── product.repository.js
 │ ├── user.repository.js
+│ ├── order.repository.js
 │ └── mock.repository.js
 ├── services/
 │ ├── product.service.js
 │ ├── user.service.js
+│ ├── order.service.js
 │ └── mock.service.js
 ├── controllers/
 │ ├── product.controller.js
 │ ├── user.controller.js
+│ ├── order.controller.js
 │ ├── mock.controller.js
 │ └── logger.controller.js
 ├── routes/
 │ ├── product.routes.js
 │ ├── user.routes.js
+│ ├── order.routes.js
 │ ├── mock.routes.js
 │ └── logger.routes.js
 ├── middlewares/
 │ ├── errorHandler.middleware.js
 │ └── notFound.middleware.js
-└── utils/
-└── mockGenerators.js
+├── utils/
+│ └── mockGenerators.js
+└── tests/
+├── hooks.js
+├── users.test.js
+├── orders.test.js
+├── mocks.test.js
+├── logger.test.js
+├── docs.test.js
+└── notFound.test.js
 
 
 ## Arquitectura por capas
@@ -83,7 +99,7 @@ src/
 
 ### Por qué separar Service de Repository
 
-El Repository responde "¿cómo busco/guardo esto en la base?" — es intercambiable, podría cambiar de motor de base de datos sin tocar el resto de la app. El Service responde "¿qué reglas del negocio aplican acá?" — por ejemplo, que un producto sin stock cambie automáticamente su estado, o que un pedido de prueba solo pueda generarse si ya existen usuarios con rol `CLIENTE`. Mezclar esa lógica dentro del Repository lo volvería frágil y dependiente del motor de base de datos elegido; separarla permite razonar y testear las reglas de negocio sin necesidad de una base de datos real.
+El Repository responde "¿cómo busco/guardo esto en la base?" — es intercambiable, podría cambiar de motor de base de datos sin tocar el resto de la app. El Service responde "¿qué reglas del negocio aplican acá?" — por ejemplo, que un producto sin stock cambie automáticamente su estado, o que un pedido solo pueda crearse si el usuario indicado existe realmente. Mezclar esa lógica dentro del Repository lo volvería frágil y dependiente del motor de base de datos elegido; separarla permite razonar y testear las reglas de negocio sin necesidad de una base de datos real.
 
 ## Constantes del dominio
 
@@ -123,6 +139,7 @@ Todos los errores del proyecto pasan por un middleware global centralizado (`src
 | USER_MISSING_FIELDS | 400 | Faltan campos obligatorios |
 | ORDER_NOT_FOUND | 404 | Pedido inexistente |
 | ORDER_INVALID_STATUS | 400 | Estado de pedido inválido |
+| ORDER_MISSING_FIELDS | 400 | Faltan campos obligatorios del pedido |
 | DELIVERY_NOT_FOUND | 404 | Entrega inexistente |
 | MOCK_INVALID_QTY | 400 | Cantidad no numérica, no entera, o menor/igual a 0 |
 | MOCK_QTY_TOO_LARGE | 400 | Cantidad solicitada excede el máximo permitido (100) |
@@ -144,46 +161,57 @@ El proyecto usa **Winston** como logger centralizado, configurado en `src/config
 - **Producción** (`NODE_ENV=production`): solo se registran desde `info` hacia arriba (se filtran `debug` y `http`).
 
 ### Persistencia en archivos
-Los niveles `warning`, `error` y `fatal` se guardan en la carpeta `logs/`, con rotación diaria (`logs/error-YYYY-MM-DD.log`) y retención de 14 días. Los niveles `info`, `http` y `debug` solo se muestran por consola, no se persisten en archivo.
-
-La carpeta `logs/` está incluida en `.gitignore` — los archivos generados por la aplicación nunca se suben al repositorio.
+Los niveles `warning`, `error` y `fatal` se guardan en la carpeta `logs/`, con rotación diaria y retención de 14 días. La carpeta `logs/` está en `.gitignore`.
 
 ### Endpoint de prueba
 
 GET /api/logger/test
 
-
 Genera un mensaje de cada uno de los 6 niveles.
 
 ## Documentación de la API (Swagger)
 
-La API cuenta con documentación interactiva generada con Swagger/OpenAPI (configurada en `src/config/swagger.config.js`, completamente separada de la lógica de rutas), disponible en: 
+Documentación interactiva disponible en: http://localhost:3000/api/docs
 
-http://localhost:3000/api/docs
-
-
-Desde ahí se puede consultar la información general de la API, explorar los endpoints agrupados por módulo, y probarlos en vivo con el botón **"Try it out"**.
 
 ### Módulos documentados (tags)
-
-- **Users**: CRUD de usuarios y productos
-- **Orders**: generación de pedidos de prueba — actualmente disponible únicamente a través del módulo de mocking (`POST /api/mocks/seed/orders`); no existe todavía un CRUD propio de pedidos como entidad de negocio independiente
-- **Deliveries**: generación de entregas de prueba — mismo caso que Orders, disponible vía mocking
-- **Mocks**: generación (sin persistir) y siembra (con persistencia) de datos simulados: usuarios, pedidos y entregas
-- **Logger**: endpoint interno de validación del sistema de logs — se documenta aclarando explícitamente que no es una funcionalidad de negocio, sino una herramienta de diagnóstico
+- **Users**: CRUD de usuarios
+- **Products**: CRUD de productos
+- **Orders**: CRUD de pedidos (crear, consultar, listar, actualizar estado)
+- **Deliveries**: generación de entregas de prueba, vía mocking
+- **Mocks**: generación y siembra de datos simulados
+- **Logger**: endpoint interno de validación del sistema de logs
 
 ### Schemas reutilizables
-
 `User`, `Order`, `Delivery`, `OrderItem`, `Product`, `SuccessResponse`, `ErrorResponse` — definidos en `src/docs/schemas.js`.
 
-### Cómo probar
+## Testing
 
-1. Levantar el servidor con `npm run dev`
-2. Abrir `http://localhost:3000/api/docs` en el navegador
-3. Expandir cualquier endpoint, click en "Try it out", completar los parámetros o el body si corresponde, y ejecutar
-4. La respuesta real de la API se muestra directamente en la interfaz, incluyendo los casos de error documentados (por ejemplo, `GET /api/users/{id}` con un id inexistente devuelve `404` con el formato de `ErrorResponse`)
+### Herramientas
+**Mocha** (organización/ejecución), **Chai** (aserciones) y **Supertest** (peticiones HTTP contra la app de Express, sin necesidad de levantar un puerto real — la app está separada del arranque del servidor en `src/app.js` / `src/server.js`).
 
-La documentación refleja el comportamiento real de la API — no se documentan respuestas ni errores que el sistema no devuelve.
+### Cómo ejecutar
+
+npm test
+
+Corre con `NODE_ENV=test`, usando las variables definidas en `.env.test` (base de datos separada de la de desarrollo).
+
+### Variables de entorno para testing (`.env.test`)
+Ver `.env.test.example` como plantilla. Se necesita:
+- `PORT` (por ejemplo `3001`)
+- `MONGODB_URI` apuntando a una base **distinta** a la de desarrollo (por ejemplo `mongodb://localhost:27017/shipnow_test`)
+- `NODE_ENV=test`
+
+### Módulos cubiertos
+- **Users**: listado, creación válida, campos faltantes (400), email duplicado (409)
+- **Orders**: creación válida, consulta por id, id inexistente (404), estado inválido (400)
+- **Mocks**: generación sin persistir, cantidad inválida (400), siembra de usuarios, siembra de pedidos sin clientes disponibles (400)
+- **Logger**: endpoint de prueba
+- **Swagger**: disponibilidad de `/api/docs`
+- **Ruta inexistente**: 404 con `ROUTE_NOT_FOUND`
+
+### Limpieza de datos
+Después de cada test se vacían todas las colecciones de la base de testing (`src/tests/hooks.js`, mediante `mochaHooks`), garantizando que los tests sean independientes entre sí y no dependan del orden de ejecución ni de datos cargados manualmente.
 
 ## Endpoints
 
@@ -203,7 +231,16 @@ La documentación refleja el comportamiento real de la API — no se documentan 
 |---|---|---|
 | GET | /api/users | Lista todos los usuarios |
 | GET | /api/users/:id | Detalle de un usuario |
-| POST | /api/users | Crea un usuario (rol `CLIENTE` por defecto, no manipulable desde el body) |
+| POST | /api/users | Crea un usuario (rol `CLIENTE` por defecto) |
+
+### Orders
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | /api/orders | Lista todos los pedidos |
+| GET | /api/orders/:id | Detalle de un pedido |
+| POST | /api/orders | Crea un pedido (requiere `user` existente y `address`) |
+| PATCH | /api/orders/:id/status | Actualiza el estado de un pedido |
 
 ### Mocks
 
@@ -218,31 +255,17 @@ La documentación refleja el comportamiento real de la API — no se documentan 
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | /api/logger/test | Genera un log de cada nivel (herramienta interna, no funcionalidad de negocio) |
+| GET | /api/logger/test | Genera un log de cada nivel (herramienta interna) |
 
-## Cómo probar los endpoints de mocking
-
-Orden recomendado, porque cada paso depende de datos generados en el anterior:
-
-1. `POST /api/mocks/seed/users?qty=10` — genera clientes, repartidores y administradores en la base
-2. `POST /api/mocks/seed/orders?qty=5` — se asocian a clientes ya sembrados
-3. `POST /api/mocks/seed/deliveries?qty=3` — se asocian a pedidos y repartidores ya sembrados
-
-Los datos generados respetan los modelos reales del proyecto y usan exclusivamente las constantes de roles, estados y prioridades definidas en `src/constants/index.js` — nunca strings sueltos escritos a mano.
-
-## Cómo probar el manejo de errores (incluye casos del módulo de mocks)
+## Cómo probar el manejo de errores
 
 | Caso | Endpoint | Resultado esperado |
 |---|---|---|
 | Producto inexistente | `GET /api/products/000000000000000000000000` | 404, `PRODUCT_NOT_FOUND` |
-| Producto con precio negativo | `POST /api/products` con `price: -100` | 400, `PRODUCT_INVALID_PRICE` |
+| Pedido inexistente | `GET /api/orders/000000000000000000000000` | 404, `ORDER_NOT_FOUND` |
+| Estado de pedido inválido | `PATCH /api/orders/:id/status` con `status: "NO_EXISTE"` | 400, `ORDER_INVALID_STATUS` |
 | Email de usuario duplicado | `POST /api/users` con un email ya registrado | 409, `USER_EMAIL_EXISTS` |
 | Mock con cantidad negativa | `GET /api/mocks/users?qty=-5` | 400, `MOCK_INVALID_QTY` |
-| Mock con cantidad no numérica | `GET /api/mocks/users?qty=abc` | 400, `MOCK_INVALID_QTY` |
 | Mock con cantidad excesiva | `GET /api/mocks/users?qty=500` | 400, `MOCK_QTY_TOO_LARGE` |
 | Sembrar pedidos sin clientes en la base | `POST /api/mocks/seed/orders?qty=5` | 400, `MOCK_NO_CLIENTS_AVAILABLE` |
-| Sembrar entregas sin pedidos/repartidores | `POST /api/mocks/seed/deliveries?qty=3` | 400, `MOCK_NO_RELATED_DATA` |
 | Ruta inexistente | `GET /api/no-existe` | 404, `ROUTE_NOT_FOUND` |
-
-
-

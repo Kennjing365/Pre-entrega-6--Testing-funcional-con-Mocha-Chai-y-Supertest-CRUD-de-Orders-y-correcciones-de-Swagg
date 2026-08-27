@@ -15,6 +15,7 @@ export const ErrorDictionary = {
     // Pedidos / Entregas
     ORDER_NOT_FOUND: () => new NotFoundError('Pedido no encontrado', 'ORDER_NOT_FOUND'),
     ORDER_INVALID_STATUS: () => new BadRequestError('Estado de pedido inválido', 'ORDER_INVALID_STATUS'),
+    ORDER_MISSING_FIELDS: () => new BadRequestError('Faltan campos obligatorios del pedido', 'ORDER_MISSING_FIELDS'),
     DELIVERY_NOT_FOUND: () => new NotFoundError('Entrega no encontrada', 'DELIVERY_NOT_FOUND'),
 
     // Mocks

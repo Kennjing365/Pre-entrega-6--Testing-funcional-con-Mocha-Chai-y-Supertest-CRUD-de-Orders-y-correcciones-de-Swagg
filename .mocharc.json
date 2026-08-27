@@ -1,0 +1,6 @@
+{
+    "require": ["src/tests/hooks.js"],
+    "spec": "src/tests/**/*.test.js",
+    "timeout": 10000,
+    "exit": true
+}

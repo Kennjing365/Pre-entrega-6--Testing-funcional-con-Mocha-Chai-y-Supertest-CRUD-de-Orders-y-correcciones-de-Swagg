@@ -14,7 +14,7 @@ const router = Router()
  * /api/products:
  *   get:
  *     summary: Lista todos los productos
- *     tags: [Users]
+ *     tags: [Products]
  *     parameters:
  *       - in: query
  *         name: onlyAvailable
@@ -38,7 +38,7 @@ router.get('/', getAllProducts)
  * /api/products/{id}:
  *   get:
  *     summary: Obtiene un producto por id
- *     tags: [Users]
+ *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
@@ -68,7 +68,7 @@ router.get('/:id', getProductById)
  * /api/products:
  *   post:
  *     summary: Crea un producto
- *     tags: [Users]
+ *     tags: [Products]
  *     requestBody:
  *       required: true
  *       content:
@@ -97,7 +97,7 @@ router.post('/', createProductController)
  * /api/products/{id}:
  *   put:
  *     summary: Modifica un producto
- *     tags: [Users]
+ *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
@@ -137,7 +137,7 @@ router.put('/:id', updateProductController)
  * /api/products/{id}:
  *   delete:
  *     summary: Elimina un producto
- *     tags: [Users]
+ *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
